@@ -8,10 +8,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Cấp quyền ghi trực tiếp cho Token
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -24,11 +26,10 @@ jobs:
       - name: Run script
         run: python robot.py
 
-      - name: Save changes
+      - name: Force Deploy MT.json
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add MT.json
-          # Lệnh push này sử dụng quyền từ môi trường chạy
-          git commit -m "Auto update link m3u8" || exit 0
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main --force
+          git commit -m "Update MT.json" || echo "No changes to commit"
+          git push origin main --force
