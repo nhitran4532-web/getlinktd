@@ -1,34 +1,60 @@
-import requests
+import asyncio
 import json
-import re
+from playwright.async_api import async_playwright
 
-def get_all_m3u8():
-    # Đây là "nguồn tổng" đã được giải mã sẵn link m3u8 của các trang bóng đá
-    source_url = "https://raw.githubusercontent.com/hongduy02/gavang/main/gavang.m3u"
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    results = []
+async def intercept_m3u8():
+    async with async_playwright() as p:
+        # Dùng trình duyệt thật để tránh bị check bot
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+        )
+        page = await context.new_page()
 
-    try:
-        response = requests.get(source_url, headers=headers, timeout=15)
-        if response.status_code == 200:
-            # Dùng Regex để quét sạch các cặp Tên trận và Link m3u8
-            pattern = r'#EXTINF:.*?,(.*?)\n(http.*?\.m3u8)'
-            matches = re.findall(pattern, response.text)
+        found_links = []
+
+        # HÀM CHẶN DÒNG DỮ LIỆU
+        async def handle_request(request):
+            url = request.url
+            # Lọc lấy link m3u8, bỏ qua mấy cái link quảng cáo hay rác
+            if ".m3u8" in url and "google" not in url and "doubleclick" not in url:
+                if url not in [item['url'] for item in found_links]:
+                    found_links.append({
+                        "name": f"Trận {len(found_links) + 1}",
+                        "url": url,
+                        "headers": {
+                            "Referer": "https://gavang...tv/", # Thay bằng domain thật của nó
+                            "User-Agent": "Mozilla/5.0..."
+                        }
+                    })
+                    print(f"Đã hốt được: {url}")
+
+        # Bắt đầu nghe lén Network
+        page.on("request", handle_request)
+
+        try:
+            # 1. Đi thẳng vào trang chủ
+            print("Đang đột nhập Gà Vàng...")
+            await page.goto("https://gavang...tv/", wait_until="networkidle", timeout=60000)
             
-            for name, url in matches:
-                results.append({
-                    "title": name.strip(), # MonPlayer cần title
-                    "url": url.strip()
-                })
-    except Exception as e:
-        print(f"Lỗi: {e}")
-    return results
+            # 2. Cuộn trang để nó load hết các trận
+            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await asyncio.sleep(10) # Đợi 10s cho các request ngầm chạy hết
 
-# Chạy Robot
-data = get_all_m3u8()
+            # 3. Lưu thành file JSON cho MoPlayer
+            output = {
+                "name": "Gavang Auto Live",
+                "urls": found_links
+            }
+            
+            with open("playlist.json", "w", encoding="utf-8") as f:
+                json.dump(output, f, ensure_ascii=False, indent=4)
+            
+            print(f"Xong! Hốt được tổng cộng {len(found_links)} link.")
 
-# Xuất file MT.json
-with open("MT.json", "w", encoding="utf-8") as f:
-    json.dump(data, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"Lỗi: {e}")
+        finally:
+            await browser.close()
 
-print(f"Đã hốt được {len(data)} trận đấu m3u8!")
+asyncio.run(intercept_m3u8())
