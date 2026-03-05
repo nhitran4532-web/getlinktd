@@ -7,11 +7,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          persist-credentials: false 
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -24,15 +24,12 @@ jobs:
       - name: Run script
         run: python robot.py
 
-      - name: Commit files
+      - name: Force Update MT.json
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add MT.json
-          git commit -m "Auto update link m3u8" -a || exit 0
-
-      - name: Push changes
-        uses: Ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: main
+          git commit -m "Auto update link m3u8"
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git push origin HEAD:main --force
