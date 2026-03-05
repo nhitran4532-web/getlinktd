@@ -1,0 +1,31 @@
+name: Auto Update Link M3U8
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Cứ mỗi 30 phút hệ thống tự chạy một lần
+  workflow_dispatch: # Cho phép bạn bấm nút chạy thử ngay lập tức
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run script
+        run: python robot.py
+
+      - name: Save changes
+        run: |
+          git config --global user.name 'github-actions'
+          git config --global user.email 'actions@github.com'
+          git add MT.json
+          git commit -m "Auto update link" || exit 0
+          git push
